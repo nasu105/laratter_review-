@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Validator;
 use App\Models\Tweet;
+use Auth;
+use App\Models\User;
 
 class TweetController extends Controller
 {
@@ -44,7 +46,9 @@ class TweetController extends Controller
                 ->withErrors($validator);
         }
 
-        $result = Tweet::create($request->all());
+        // フォームから送信されてきたデータとユーザIDをマージし、DBにinsertする
+        $data = $request->merge(['user_id'=> Auth::user()->id])->all();
+        $result = Tweet::create($data);
         return redirect()->route('tweet.index');
     }
 
@@ -99,4 +103,26 @@ class TweetController extends Controller
         $result = Tweet::find($id)->delete();
         return redirect()->route('tweet.index');
     }
+
+    public function mydata()
+    {
+        $tweets = User::query()
+            ->find(Auth::user()->id)
+            ->userTweets()
+            ->orderBy('created_at', 'desc')
+            ->get();
+        return response()->view('tweet.index', compact('tweets'));
+    }
+
+    public function timeline()
+    {
+        $followings = User::find(Auth::id())->followings->pluck('id')->all();
+        $tweets = Tweet::query()
+            ->where('user_id', Auth::id())
+            ->orWhereIn('user_id', $followings)
+            ->orderBy('updated_at', 'desc')
+            ->get();
+        return view('tweet.index', compact('tweets'));
+    }
+
 }
